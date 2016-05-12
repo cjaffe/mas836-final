@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+    <title>Road Quality Data</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+    <script src="neighborhoods.js"></script>
+    <script src="streets.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js"></script> 
+    <style>
+		p {
+			font-size: 20px;
+		}
+		#pothole {
+			color: red;
+			display: none;
+		}
+
+		#map {
+			display: none;
+		}
+
+		#map-btn {
+		    position: absolute;
+		    top: 20px;
+		    right: 35px;
+		}
+		</style>
+</head>
+<body>
+<div class="container" style="margin: 50px">
+    <div id="labels" class="col-md-3">
+    <h2>Sensor Readings</h2>
+		<p>Accelerometer Values</p>
+		<p>x val is: <span id="xval"></span></p>
+		<p>y val is: <span id="yval"></span></p>
+		<p>z val is: <span id="zval"></span></p>
+		<p>Piezo Values</p>
+		<p>piezo 1 val is: <span id="piezo1"></span></p>
+		<p>piezo 2 val is: <span id="piezo2"></span></p>
+	</div>
+	<div id="readings" class="col-md-1"></div>
+	<div id="quality" class="col-md-3">
+		<h2>Road Quality</h2>
+		<p>Overall Quality</p>
+		<p id="overall-quality"></p> 
+		<p>Pothole Count</p>
+		<p id="pothole-count">0</p>
+	
+	</div>
+	<div id="qual-circles" class="col-md-1"></div>
+	<div id="map-btn">
+		<button class='btn' onclick='toggleMap()'>Show Map</button>
+	</div>
+	<div id="map" class="col-md-4">
+        <h2>Map of Cambridge</h2>
+    </div>
+</div>
+<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+<script>
+
+    var socket = io();
+    socket.on('data', function (msg) {
+        //console.log(msg);
+        updateBuffer(msg);
+
+    });
+
+    /*
+     Implementation of Neil Gershenfeld's serial communication protocol from the accelerometer I2C example
+     Board:  http://academy.cba.mit.edu/classes/input_devices/accel/hello.ADXL343.png
+     AVR code: http://academy.cba.mit.edu/classes/input_devices/accel/hello.ADXL343.c
+     Original Python code: http://academy.cba.mit.edu/classes/input_devices/accel/hello.ADXL343.py
+     */
+    var buffer = [0, 0, 0, 0, 0 , 0, 0, 0, 0, 0],
+            eps = 0.1,
+            xfilt = 0.0,
+            yfilt = 0.0,
+            zfilt = 0.0;
+    var x, y, z, piezo1, piezo2, piezo1_prev, piezo2_prev;
+    var data = [-1, 0, 0, 0, -1, 0, 0]; // label, xval, yval, zval, label, piezo1, piezo2
+    var qual_data = [0, 0, 0, 0, 0]; // xval, yval, zval, piezo1, piezo2
+    var qual_data_prev = [0, 0, 0, 0, 0];
+    var quality;
+    var qual_arr = [0, 0, 0, 0];
+    var pothole_count = 0;
+    var show_map = false;
+    var colors = ['#fff7ec','#fee8c8','#fdd49e','#fdbb84','#fc8d59','#ef6548','#d7301f','#b30000','#7f0000'];
+
+
+    function updateBuffer(b) {
+        buffer.shift();
+        buffer.push(b);
+        //find framing!
+        if (buffer[0] == 1 && buffer[1] == 2 && buffer[2] == 3 && buffer[3] == 4) {
+            //console.log("saw piezo1"); //DEBUG
+            piezo1 = 256*buffer[5] + buffer[4];
+            document.getElementById("piezo1").innerHTML = piezo1;
+            data[5] = piezo1;
+            qual_data[3] = piezo1;
+        }
+        if (buffer[0] == 5 && buffer[1] == 6 && buffer[2] == 7 && buffer[3] == 8) {
+            //console.log("saw piezo2"); //DEBUG
+            piezo2 = 256*buffer[5] + buffer[4];
+            document.getElementById("piezo2").innerHTML = piezo2;
+            data[6] = piezo2;
+            qual_data[4] = piezo2;
+        }
+        if (buffer[0] == 9 && buffer[1] == 10 && buffer[2] == 11 && buffer[3] == 12) {
+            //console.log("saw accel"); //DEBUG
+            updateAccel(buffer[4], buffer[5], buffer[6], buffer[7], buffer[8], buffer[9]);
+        }
+        if (buffer[0] == 13 && buffer[1] == 14 && buffer[2] == 15 && buffer[3] == 16) {
+        	console.log("saw GPS!");
+        }
+
+    }
+
+    function updateAccel(x0, x1, y0, y1, z0, z1) {
+        x = x0 + 255*x1;
+        y = y0 + 255*y1;
+        z = z0 + 255*z1;
+        if (x > 32768) {
+            x = -1*(65536-x);
+        }
+        if (y > 32768) {
+            y = -1*(65536-y);
+        }
+        if (z > 32768) {
+            z = -1*(65536-z);
+        }
+        xfilt = (1-eps)*xfilt+eps*x;
+        yfilt = (1-eps)*yfilt+eps*y;
+        zfilt = (1-eps)*zfilt+eps*z;
+        
+        document.getElementById("xval").innerHTML = parseFloat(xfilt).toFixed(2);
+        document.getElementById("yval").innerHTML = parseFloat(yfilt).toFixed(2);
+        document.getElementById("zval").innerHTML = parseFloat(zfilt).toFixed(2);
+        data[1] = xfilt;
+        data[2] = yfilt;
+        data[3] = zfilt;
+        qual_data[0] = xfilt;
+        qual_data[1] = yfilt;
+        qual_data[2] = zfilt;
+    }
+</script>
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script type="text/javascript" src="bikeSensor.js"></script>
+</body>
+</html>
