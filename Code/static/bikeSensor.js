@@ -207,3 +207,12 @@ function mapDefaultAction() {
   updateMap();
 }
 
+//
+// File reading/ writing
+//
+function downloadData() {
+  var uriContent = "data:application/octet-stream," + encodeURIComponent(content);
+  newWindow = window.open(uriContent, 'saveDoc');
+}
+
+

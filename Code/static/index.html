@@ -23,6 +23,13 @@
 		    position: absolute;
 		    top: 20px;
 		    right: 35px;
+		    display: none;
+		}
+
+		#download-btn {
+		    position: absolute;
+		    top: 20px;
+		    right: 35px;
 		}
 		</style>
 </head>
@@ -48,8 +55,11 @@
 	
 	</div>
 	<div id="qual-circles" class="col-md-1"></div>
-	<div id="map-btn">
+	<!-- <div id="map-btn">
 		<button class='btn' onclick='toggleMap()'>Show Map</button>
+	</div> -->
+	<div id="download-btn">
+		<button class='btn' onclick='downloadData()'>Download Data</button>
 	</div>
 	<div id="map" class="col-md-4">
         <h2>Map of Cambridge</h2>
@@ -85,7 +95,7 @@
     var pothole_count = 0;
     var show_map = false;
     var colors = ['#fff7ec','#fee8c8','#fdd49e','#fdbb84','#fc8d59','#ef6548','#d7301f','#b30000','#7f0000'];
-
+    var content = "";
 
     function updateBuffer(b) {
         buffer.shift();
@@ -97,6 +107,7 @@
             document.getElementById("piezo1").innerHTML = piezo1;
             data[5] = piezo1;
             qual_data[3] = piezo1;
+            content = content + piezo1 + ", ";
         }
         if (buffer[0] == 5 && buffer[1] == 6 && buffer[2] == 7 && buffer[3] == 8) {
             //console.log("saw piezo2"); //DEBUG
@@ -104,6 +115,7 @@
             document.getElementById("piezo2").innerHTML = piezo2;
             data[6] = piezo2;
             qual_data[4] = piezo2;
+            content = content + piezo2 + ", ";
         }
         if (buffer[0] == 9 && buffer[1] == 10 && buffer[2] == 11 && buffer[3] == 12) {
             //console.log("saw accel"); //DEBUG
@@ -141,6 +153,7 @@
         qual_data[0] = xfilt;
         qual_data[1] = yfilt;
         qual_data[2] = zfilt;
+        content = content + xfilt + ", " + yfilt + ", " + zfilt + "\n";
     }
 </script>
 <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
